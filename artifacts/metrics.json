@@ -1,0 +1,48 @@
+{
+  "adaptive": {
+    "average_precision": 0.2102061399157838,
+    "brier_score": 0.040576034895139466,
+    "decision_threshold": 0.1,
+    "ece": 0.03265931561900421,
+    "log_loss": 0.17036580261055717,
+    "observations": 10000,
+    "positive_rate": 0.0448,
+    "precision_at_threshold": 0.12748171368861025,
+    "precision_at_top_5pct": 0.246,
+    "recall_at_threshold": 0.5446428571428571,
+    "recall_at_top_5pct": 0.27455357142857145,
+    "roc_auc": 0.7587593847212252
+  },
+  "config": {
+    "detector_threshold": 3.5,
+    "drift_at": 6600,
+    "label_delay": 40,
+    "replay_size": 600,
+    "samples": 12000,
+    "seed": 7,
+    "warmup": 2000
+  },
+  "drift_detections": [
+    6950
+  ],
+  "frozen": {
+    "average_precision": 0.12462781298628045,
+    "brier_score": 0.04272464474302123,
+    "decision_threshold": 0.1,
+    "ece": 0.038596414374977725,
+    "log_loss": 0.18313245295596436,
+    "observations": 10000,
+    "positive_rate": 0.0448,
+    "precision_at_threshold": 0.10949271722752386,
+    "precision_at_top_5pct": 0.15,
+    "recall_at_threshold": 0.48660714285714285,
+    "recall_at_top_5pct": 0.16741071428571427,
+    "roc_auc": 0.7255076535953577
+  },
+  "leakage_audit": {
+    "labels_processed": 12000,
+    "minimum_observed_delay": 40,
+    "violations": 0
+  },
+  "relative_log_loss_improvement": 0.06971265954962681
+}
