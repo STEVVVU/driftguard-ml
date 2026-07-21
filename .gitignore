@@ -6,6 +6,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+data/
 artifacts/*
 !artifacts/.gitkeep
 !artifacts/metrics.json
