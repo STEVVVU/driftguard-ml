@@ -13,7 +13,6 @@ from pathlib import Path
 ELECTRICITY_URL = "https://openml.org/data/v1/download/2419/electricity.arff"
 ELECTRICITY_MD5 = "8ca97867d960ae029ae3a9ac2c923d34"
 ELECTRICITY_FEATURES = (
-    "date",
     "period",
     "nswprice",
     "nswdemand",
@@ -92,7 +91,8 @@ def electricity_stream(path: str | Path) -> Iterator[LabeledObservation]:
             if label not in {"UP", "DOWN"}:
                 raise ValueError(f"row {index} has invalid class {label!r}")
 
-            numeric = (date, period, nswprice, nswdemand, vicprice, vicdemand, transfer)
+            del date
+            numeric = (period, nswprice, nswdemand, vicprice, vicdemand, transfer)
             features = {
                 name: float(value)
                 for name, value in zip(ELECTRICITY_FEATURES, numeric, strict=True)
@@ -105,4 +105,3 @@ def electricity_stream(path: str | Path) -> Iterator[LabeledObservation]:
         raise ValueError("ARFF file does not contain an @data section")
     if index == 0:
         raise ValueError("ARFF file contains no observations")
-

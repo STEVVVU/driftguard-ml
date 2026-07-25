@@ -29,6 +29,7 @@ class BinaryMetrics:
             "decision_threshold": threshold,
             "precision_at_threshold": self.precision(threshold),
             "recall_at_threshold": self.recall(threshold),
+            "accuracy_at_threshold": self.accuracy(threshold),
             "precision_at_top_5pct": self.precision_at_fraction(0.05),
             "recall_at_top_5pct": self.recall_at_fraction(0.05),
         }
@@ -120,6 +121,13 @@ class BinaryMetrics:
             for label, probability in zip(self.labels, self.probabilities, strict=True)
         )
         return true_positives / positives
+
+    def accuracy(self, threshold: float) -> float:
+        correct = sum(
+            label == int(probability >= threshold)
+            for label, probability in zip(self.labels, self.probabilities, strict=True)
+        )
+        return correct / len(self.labels)
 
     def _top_fraction_labels(self, fraction: float) -> list[int]:
         if not 0.0 < fraction <= 1.0:

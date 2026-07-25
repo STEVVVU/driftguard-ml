@@ -1,0 +1,63 @@
+{
+  "adaptive": {
+    "accuracy_at_threshold": 0.7773119666600516,
+    "average_precision": 0.8227688420137387,
+    "brier_score": 0.1545099683220613,
+    "decision_threshold": 0.5,
+    "ece": 0.02155272477979589,
+    "log_loss": 0.4737352699885903,
+    "observations": 40312,
+    "positive_rate": 0.42887973804326257,
+    "precision_at_threshold": 0.7695201037613489,
+    "precision_at_top_5pct": 0.9692460317460317,
+    "recall_at_threshold": 0.6863323500491643,
+    "recall_at_top_5pct": 0.11301983920411822,
+    "roc_auc": 0.8501447276089107
+  },
+  "config": {
+    "detector_min_effect": 0.02,
+    "detector_recent": 750,
+    "detector_reference": 1500,
+    "detector_z": 3.5,
+    "label_delay": 48,
+    "replay_size": 2000,
+    "warmup": 5000
+  },
+  "dataset": {
+    "evaluation_order": "source chronological order",
+    "md5": "8ca97867d960ae029ae3a9ac2c923d34",
+    "name": "OpenML Electricity",
+    "rows": 45312,
+    "url": "https://openml.org/data/v1/download/2419/electricity.arff"
+  },
+  "drift_alerts": [
+    7366,
+    11607,
+    15762,
+    19481,
+    23044,
+    28979,
+    31691
+  ],
+  "frozen": {
+    "accuracy_at_threshold": 0.7403006548918436,
+    "average_precision": 0.7673173189441373,
+    "brier_score": 0.20100852340806474,
+    "decision_threshold": 0.5,
+    "ece": 0.13796625093616188,
+    "log_loss": 0.640944653382292,
+    "observations": 40312,
+    "positive_rate": 0.42887973804326257,
+    "precision_at_threshold": 0.8460523645220215,
+    "precision_at_top_5pct": 0.9657738095238095,
+    "recall_at_threshold": 0.48221412458788826,
+    "recall_at_top_5pct": 0.11261495748741975,
+    "roc_auc": 0.7725247338899649
+  },
+  "leakage_audit": {
+    "labels_processed": 45312,
+    "minimum_observed_delay": 48,
+    "violations": 0
+  },
+  "relative_log_loss_improvement": 0.260879597811341
+}

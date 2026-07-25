@@ -33,6 +33,7 @@ def test_electricity_stream_preserves_order_and_encodes_day(tmp_path) -> None:
     assert rows[0].features["day_2"] == 1.0
     assert rows[0].features["day_7"] == 0.0
     assert rows[1].features["transfer"] == 0.7
+    assert "date" not in rows[0].features
 
 
 def test_download_rejects_checksum_mismatch_without_replacing_destination(tmp_path) -> None:
@@ -72,4 +73,3 @@ def test_parser_rejects_invalid_class(tmp_path) -> None:
     source.write_text(ARFF.replace(",UP", ",UNKNOWN"), encoding="utf-8")
     with pytest.raises(ValueError, match="invalid class"):
         list(electricity_stream(source))
-

@@ -10,3 +10,4 @@ data/
 artifacts/*
 !artifacts/.gitkeep
 !artifacts/metrics.json
+!artifacts/electricity_metrics.json
