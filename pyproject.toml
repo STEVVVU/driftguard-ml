@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "driftguard-ml"
 version = "0.1.0"
-description = "Leakage-safe online risk modeling under delayed labels and concept drift"
+description = "Leakage-safe online learning on real streams with delayed labels and concept drift"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -28,4 +28,3 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-

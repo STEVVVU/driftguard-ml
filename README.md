@@ -1,49 +1,53 @@
 # DriftGuard ML
 
-An online fraud-risk system built around the failure modes that production ML
-teams actually face: delayed labels, class imbalance, concept drift, temporal
-leakage, and monitoring a model after deployment.
+A delayed-feedback online-learning system built around production failure
+modes: concept drift, temporal leakage, stale models, calibration, and labels
+that arrive after predictions are served.
 
 This is not a notebook. It is a deterministic experiment package with a CLI,
-an auditable event-time loop, unit tests, saved metrics, and CI.
+an auditable event-time loop, checksum-verified real data, unit tests, saved
+metrics, and CI.
 
 ## What it demonstrates
 
-- **Leakage-safe prequential evaluation:** predict first, learn only when the
-  label arrives 40 events later.
+- **Real chronological evaluation:** 45,312 observations from OpenML's
+  Electricity stream are evaluated in source order, never randomly split.
+- **Leakage-safe prequential evaluation:** predict first, then learn when the
+  label becomes observable 48 events later.
 - **Online learning:** sparse FTRL-Proximal logistic regression with a
   past-only streaming standardizer.
 - **Drift monitoring:** a clipped two-window significance test watches a fixed
   reference model so adaptation cannot hide degradation.
 - **Drift response:** the adaptive model resets and replays a bounded recent
   label buffer after an alert.
-- **Risk-appropriate metrics:** log loss, Brier score, calibration error,
-  ROC-AUC, average precision, and top-5%-review precision/recall.
-- **Reproducibility:** the data-generating process and regime change are
-  explicit, seeded, and require no external dataset.
+- **Evaluation depth:** log loss, Brier score, calibration error, ROC-AUC,
+  average precision, accuracy, and a label-timing audit.
+- **Reproducibility:** OpenML content is checked against its published MD5;
+  a seeded synthetic stream provides a known drift-onset control.
 
 ## Resume highlights
 
-- Built a leakage-safe online fraud-risk pipeline with delayed labels,
-  FTRL-Proximal learning, streaming standardization, and statistically robust
-  concept-drift detection.
-- Reduced log loss by **6.97%** and increased average precision from **0.1246
-  to 0.2102** against a frozen pre-drift baseline across 10,000 evaluated
-  events.
-- Designed a temporal audit that processed 12,000 labels with a 40-event delay
-  and verified **zero early-label violations**.
+- Built a leakage-safe online-learning system with FTRL-Proximal optimization,
+  past-only feature scaling, delayed labels, bounded replay, and statistically
+  robust concept-drift detection.
+- Improved chronological holdout log loss by **26.1%**, ROC-AUC from **0.773
+  to 0.850**, and accuracy from **74.03% to 77.73%** across 40,312 real
+  electricity-market observations.
+- Verified all 45,312 labels respected a 48-observation delay with **zero
+  temporal-leakage violations**, backed by checksum-verified source data and
+  automated CI tests.
 
 ## Architecture
 
 ```text
-transaction stream
+chronological event stream
        |
        v
 past-only standardizer ---> predict frozen + adaptive models
        |                                  |
        |                            pending-label queue
        |                                  |
-       |                   label becomes observable at t + 40
+       |                   label becomes observable at t + delay
        |                                  |
        +--------------------------> metrics + leakage audit
                                           |
@@ -52,29 +56,39 @@ past-only standardizer ---> predict frozen + adaptive models
                          fixed-reference loss drift detector
 ```
 
-The frozen model learns only during the first 2,000 events. The adaptive model
-keeps learning. At event 6,600, the generator changes both the feature
-distribution and the conditional fraud mechanism.
+The primary benchmark trains both models on the first 5,000 real observations.
+The frozen model then represents a stale deployed artifact while the adaptive
+model continues learning from labels after their 48-event delay.
 
-## Measured result
+## Real-data result
 
-Canonical run: Python 3.11, 12,000 events, seed 7.
+Dataset: OpenML Electricity, all 45,312 rows in source chronological order.
+Metrics cover the 40,312 post-warmup observations.
 
 | Metric | Frozen model | Adaptive model |
 | --- | ---: | ---: |
-| Log loss | 0.1831 | **0.1704** |
-| Average precision | 0.1246 | **0.2102** |
-| ROC-AUC | 0.7255 | **0.7588** |
-| Precision in top 5% reviewed | 0.1500 | **0.2460** |
-| Recall in top 5% reviewed | 0.1674 | **0.2746** |
+| Log loss | 0.6409 | **0.4737** |
+| Accuracy | 74.03% | **77.73%** |
+| ROC-AUC | 0.7725 | **0.8501** |
+| Average precision | 0.7673 | **0.8228** |
+| Calibration error | 0.1380 | **0.0216** |
 
-The adaptive path lowers log loss by **6.97%**. It detects the seeded shift at
-event 6,950, 350 events after onset. The audit processed all 12,000 labels with
-a minimum observed delay of 40 and **zero early-label violations**.
+The adaptive path lowers log loss by **26.1%** and records seven drift alerts.
+The audit processed all 45,312 labels with a minimum observed delay of 48 and
+**zero early-label violations**. The timestamp column controls ordering but is
+excluded from model features to avoid extrapolation artifacts.
 
-Across seeds 3, 7, 11, 19, and 29, adaptive log-loss improvement ranges from
-6.97% to 14.79%. The checked-in [`artifacts/metrics.json`](artifacts/metrics.json)
-is regenerated by the command below.
+The checked-in
+[`artifacts/electricity_metrics.json`](artifacts/electricity_metrics.json)
+contains the complete result and data provenance.
+
+## Controlled drift result
+
+The seeded fraud-risk generator remains as a stress test with known ground
+truth. At event 6,600 it changes both covariates and the conditional fraud
+mechanism. The adaptive path lowers log loss by **6.97%**, detects the shift at
+event 6,950, and improves top-5%-review precision from 0.150 to 0.246. See
+[`artifacts/metrics.json`](artifacts/metrics.json).
 
 ## Run it
 
@@ -82,8 +96,13 @@ No runtime dependencies are required.
 
 ```powershell
 $env:PYTHONPATH = "src"
+python -m driftguard electricity --output artifacts
 python -m driftguard run --samples 12000 --output artifacts
 ```
+
+The first command downloads the public dataset to `data/`, verifies OpenML's
+published MD5, and runs the chronological benchmark. No runtime dependencies
+are required.
 
 For development:
 
@@ -97,21 +116,23 @@ ruff check .
 
 ```text
 src/driftguard/
+  datasets.py    verified OpenML download and chronological adapter
   model.py       online standardization and FTRL-Proximal
   stream.py      documented concept-shift generator
   drift.py       Page-Hinkley and robust two-window detectors
   metrics.py     imbalanced classification and calibration metrics
   experiment.py delayed-label event loop and leakage audit
+  real_experiment.py real-data frozen-versus-adaptive evaluation
 tests/           model, detector, metric, and temporal-contract tests
 ```
 
-## Why synthetic data?
+## Dataset provenance
 
-The purpose is to test adaptation and leakage controls, not claim an
-unverifiable fraud result on a static CSV. A known data-generating process
-makes drift onset, label availability, and expected behavior inspectable. The
-same `Transaction` boundary can be replaced with a Kafka consumer or historical
-event log without changing model or monitoring code.
+The Electricity dataset is OpenML dataset 151, marked public and distributed
+as 45,312 half-hour observations from the Australian electricity market. The
+adapter uses OpenML's official download URL and published checksum. Source
+ordering is preserved. The synthetic benchmark complements it by making exact
+drift onset inspectable; it is not presented as real-world fraud evidence.
 
 ## Research context
 
