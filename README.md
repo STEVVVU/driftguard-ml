@@ -27,15 +27,14 @@ metrics, and CI.
 
 ## Resume highlights
 
-- Built a leakage-safe online-learning system with FTRL-Proximal optimization,
-  past-only feature scaling, delayed labels, bounded replay, and statistically
-  robust concept-drift detection.
-- Improved chronological holdout log loss by **26.1%**, ROC-AUC from **0.773
-  to 0.850**, and accuracy from **74.03% to 77.73%** across 40,312 real
-  electricity-market observations.
-- Verified all 45,312 labels respected a 48-observation delay with **zero
-  temporal-leakage violations**, backed by checksum-verified source data and
-  automated CI tests.
+- Built an online ML system that keeps learning after deployment while handling
+  delayed labels, changing data, and stale-model risk.
+- Improved log loss by **26.1%**, ROC-AUC from **0.773 to 0.850**, and accuracy
+  from **74.03% to 77.73%** on 40,312 chronological holdout observations.
+- Prevented future information from leaking into training by enforcing a
+  48-event label delay across all **45,312** records, with **zero violations**.
+- Implemented FTRL-Proximal learning, past-only feature scaling, drift alerts,
+  bounded replay, checksum-verified ingestion, automated tests, and CI.
 
 ## Architecture
 
