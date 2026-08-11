@@ -4,16 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "driftguard-ml"
-version = "0.1.0"
+version = "0.2.0"
 description = "Leakage-safe online learning on real streams with delayed labels and concept drift"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Portfolio Project" }]
 keywords = ["machine-learning", "concept-drift", "online-learning", "mlops"]
 
+dependencies = [
+  # Numeric core for the standardizer / FTRL inner products and the metric buffers.
+  "numpy>=2.1",
+  # Dataset ingestion (`pandas.read_csv` over the checksum-verified ARFF body).
+  "pandas>=2.2",
+  # log_loss / roc_auc_score / average_precision_score / brier_score_loss.
+  # 1.5 is the floor because `log_loss` dropped its `eps` argument there; older
+  # versions would need a compatibility shim we do not want to carry.
+  "scikit-learn>=1.5",
+  # Streaming-ML reference detectors (river.drift.ADWIN, river.drift.PageHinkley)
+  # cross-checked against the in-repo detectors. See README "Drift detection".
+  "river>=0.22",
+  # Drift reporting artifact (`driftguard report`).
+  "evidently>=0.7",
+  # Parquet engine for the reference/current frames the report is built from.
+  "pyarrow>=17",
+]
+
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.11"]
 
 [project.scripts]
 driftguard = "driftguard.cli:main"
@@ -27,4 +45,17 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# river and evidently do not ship py.typed markers we can rely on across the
+# version range this project supports.
+module = ["river.*", "evidently.*"]
+ignore_missing_imports = true
