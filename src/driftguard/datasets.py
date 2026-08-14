@@ -1,14 +1,23 @@
-"""Verified dataset download and chronological stream adapters."""
+"""Verified dataset download and chronological stream adapters.
+
+The download path stays on the standard library (``urllib`` + ``hashlib``) on
+purpose: the checksum gate is the trust boundary for this project, and it should
+not depend on a third-party HTTP client. Parsing happens afterwards, with
+``pandas.read_csv`` reading the *already verified* local file -- pandas is never
+pointed at a URL, so nothing unverified reaches the parser.
+"""
 
 from __future__ import annotations
 
-import csv
 import hashlib
 import os
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 ELECTRICITY_URL = "https://openml.org/data/v1/download/2419/electricity.arff"
 ELECTRICITY_MD5 = "8ca97867d960ae029ae3a9ac2c923d34"
@@ -20,6 +29,11 @@ ELECTRICITY_FEATURES = (
     "vicdemand",
     "transfer",
 )
+# Full ARFF column order. `date` is read so the column count can be validated but
+# is dropped from the feature set: it is a monotone index, and a linear model
+# would extrapolate off the end of it rather than learn anything transferable.
+ELECTRICITY_COLUMNS = ("date", "day", *ELECTRICITY_FEATURES, "class")
+_ELECTRICITY_DAYS = ("1", "2", "3", "4", "5", "6", "7")
 
 
 @dataclass(frozen=True)
@@ -51,7 +65,7 @@ def download_electricity(
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "DriftGuard/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "DriftGuard/0.2"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as output:
             while chunk := response.read(1024 * 1024):
@@ -67,41 +81,90 @@ def download_electricity(
     return destination
 
 
+def _data_section_offset(path: Path) -> int:
+    """Return the number of leading lines to skip to reach the ARFF data rows.
+
+    ARFF headers are variable-length, so the ``@data`` marker is located by a
+    single cheap scan and its position handed to ``read_csv`` as ``skiprows``.
+    """
+
+    with path.open("r", encoding="utf-8") as source:
+        for line_number, raw_line in enumerate(source, start=1):
+            if raw_line.strip().lower() == "@data":
+                return line_number
+    raise ValueError("ARFF file does not contain an @data section")
+
+
+def read_electricity(path: str | Path) -> pd.DataFrame:
+    """Parse a verified Electricity ARFF file into a row-ordered DataFrame.
+
+    Returns the raw typed columns in source order with the ``day`` one-hot
+    columns appended and ``label`` as 0/1. Row order is the evaluation order and
+    is never sorted or shuffled here.
+    """
+
+    path = Path(path)
+    skiprows = _data_section_offset(path)
+    frame = pd.read_csv(
+        path,
+        skiprows=skiprows,
+        header=None,
+        names=list(ELECTRICITY_COLUMNS),
+        # `day` and `class` are ARFF nominals; reading them as strings keeps the
+        # validation below comparing like with like (a numeric `day` would make
+        # "1" vs 1 checks depend on pandas' inference).
+        dtype={"day": "string", "class": "string"},
+        comment="%",
+        skip_blank_lines=True,
+        # The header scan already resolved the layout, so a short or long row is a
+        # corrupt file rather than something to be tolerated.
+        on_bad_lines="error",
+    )
+
+    if frame.empty:
+        raise ValueError("ARFF file contains no observations")
+
+    day = frame["day"].str.strip()
+    invalid_days = ~day.isin(_ELECTRICITY_DAYS)
+    if bool(invalid_days.any()):
+        row = int(invalid_days.idxmax())
+        raise ValueError(f"row {row} has invalid day {frame.loc[row, 'day']!r}")
+
+    label = frame["class"].str.strip()
+    invalid_labels = ~label.isin(("UP", "DOWN"))
+    if bool(invalid_labels.any()):
+        row = int(invalid_labels.idxmax())
+        raise ValueError(f"row {row} has invalid class {frame.loc[row, 'class']!r}")
+
+    numeric = frame[list(ELECTRICITY_FEATURES)].astype(np.float64)
+    # One-hot the weekday as float so downstream feature dicts stay homogeneous.
+    one_hot = pd.DataFrame(
+        {f"day_{value}": (day == value).to_numpy(dtype=np.float64) for value in _ELECTRICITY_DAYS},
+        index=frame.index,
+    )
+    parsed = pd.concat([numeric, one_hot], axis=1)
+    parsed["label"] = (label == "UP").to_numpy(dtype=np.int64)
+    return parsed
+
+
+def electricity_feature_columns() -> list[str]:
+    """Return the model feature column names in a fixed order."""
+
+    return [*ELECTRICITY_FEATURES, *(f"day_{value}" for value in _ELECTRICITY_DAYS)]
+
+
 def electricity_stream(path: str | Path) -> Iterator[LabeledObservation]:
     """Yield Electricity rows in source order without shuffling or lookahead."""
 
-    in_data = False
-    index = 0
-    with Path(path).open("r", encoding="utf-8", newline="") as source:
-        for raw_line in source:
-            line = raw_line.strip()
-            if not line or line.startswith("%"):
-                continue
-            if not in_data:
-                if line.lower() == "@data":
-                    in_data = True
-                continue
-
-            row = next(csv.reader([line]))
-            if len(row) != 9:
-                raise ValueError(f"row {index} has {len(row)} columns; expected 9")
-            date, day, period, nswprice, nswdemand, vicprice, vicdemand, transfer, label = row
-            if day not in {"1", "2", "3", "4", "5", "6", "7"}:
-                raise ValueError(f"row {index} has invalid day {day!r}")
-            if label not in {"UP", "DOWN"}:
-                raise ValueError(f"row {index} has invalid class {label!r}")
-
-            del date
-            numeric = (period, nswprice, nswdemand, vicprice, vicdemand, transfer)
-            features = {
-                name: float(value)
-                for name, value in zip(ELECTRICITY_FEATURES, numeric, strict=True)
-            }
-            features.update({f"day_{value}": float(day == value) for value in "1234567"})
-            yield LabeledObservation(index=index, features=features, label=int(label == "UP"))
-            index += 1
-
-    if not in_data:
-        raise ValueError("ARFF file does not contain an @data section")
-    if index == 0:
-        raise ValueError("ARFF file contains no observations")
+    frame = read_electricity(path)
+    columns = electricity_feature_columns()
+    # itertuples over a positionally-sliced frame: the event loop consumes one
+    # row at a time, and .iloc-per-row or .iterrows would each be far slower.
+    values = frame[columns].to_numpy(dtype=np.float64)
+    labels = frame["label"].to_numpy(dtype=np.int64)
+    for index, (row, label) in enumerate(zip(values, labels, strict=True)):
+        yield LabeledObservation(
+            index=index,
+            features=dict(zip(columns, row.tolist(), strict=True)),
+            label=int(label),
+        )
