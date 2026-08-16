@@ -8,10 +8,16 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from river import drift as river_drift
+
 from .datasets import ELECTRICITY_MD5, ELECTRICITY_URL, electricity_stream
-from .drift import TwoWindowDrift
+from .drift import DriftDetector, RiverDetector, TwoWindowDrift
 from .metrics import BinaryMetrics
 from .model import FTRLProximal, OnlineStandardizer
+
+# Detectors selectable from the CLI. "two_window" is the default because it is
+# the only one with a minimum-effect-size gate; see drift.py's module docstring.
+DETECTORS = ("two_window", "river_adwin", "river_page_hinkley")
 
 
 @dataclass(frozen=True)
@@ -19,6 +25,7 @@ class ElectricityExperimentConfig:
     warmup: int = 5_000
     label_delay: int = 48
     replay_size: int = 2_000
+    detector: str = "two_window"
     detector_reference: int = 1_500
     detector_recent: int = 750
     detector_min_effect: float = 0.02
@@ -31,6 +38,35 @@ class ElectricityExperimentConfig:
             raise ValueError("label_delay cannot be negative")
         if min(self.replay_size, self.detector_reference, self.detector_recent) <= 0:
             raise ValueError("replay and detector window sizes must be positive")
+        if self.detector not in DETECTORS:
+            raise ValueError(f"detector must be one of {DETECTORS}, got {self.detector!r}")
+
+    def build_detector(self) -> DriftDetector:
+        """Instantiate the configured detector.
+
+        The river alternatives are wired up so the library detectors can drive the
+        production path unchanged, which is what makes the "our detector agrees
+        with the standard implementations" claim checkable end to end and not just
+        in a unit test.
+        """
+
+        if self.detector == "river_adwin":
+            return RiverDetector(river_drift.ADWIN(delta=0.002))
+        if self.detector == "river_page_hinkley":
+            # mode="up"/alpha=1.0 mirror the in-repo one-sided, un-faded test;
+            # the threshold is scaled to the loss magnitude of this stream.
+            return RiverDetector(
+                river_drift.PageHinkley(
+                    delta=0.005, threshold=20.0, min_instances=self.detector_recent, mode="up",
+                    alpha=1.0,
+                )
+            )
+        return TwoWindowDrift(
+            reference_size=self.detector_reference,
+            recent_size=self.detector_recent,
+            min_effect=self.detector_min_effect,
+            z_threshold=self.detector_z,
+        )
 
 
 @dataclass(frozen=True)
@@ -49,9 +85,14 @@ def _log_loss(label: int, probability: float) -> float:
     return -(label * math.log(probability) + (1 - label) * math.log(1 - probability))
 
 
+# Shared default instance. Safe as a default argument because the dataclass is
+# frozen, so no caller can mutate the value the next one sees.
+DEFAULT_CONFIG = ElectricityExperimentConfig()
+
+
 def run_electricity_experiment(
     dataset: str | Path,
-    config: ElectricityExperimentConfig = ElectricityExperimentConfig(),
+    config: ElectricityExperimentConfig = DEFAULT_CONFIG,
     *,
     output_dir: str | Path | None = None,
 ) -> dict[str, object]:
@@ -62,12 +103,7 @@ def run_electricity_experiment(
     adaptive_scaler = OnlineStandardizer()
     frozen = FTRLProximal()
     adaptive = FTRLProximal()
-    detector = TwoWindowDrift(
-        reference_size=config.detector_reference,
-        recent_size=config.detector_recent,
-        min_effect=config.detector_min_effect,
-        z_threshold=config.detector_z,
-    )
+    detector = config.build_detector()
     pending: deque[PendingObservation] = deque()
     replay: deque[tuple[dict[str, float], int]] = deque(maxlen=config.replay_size)
     frozen_metrics = BinaryMetrics()

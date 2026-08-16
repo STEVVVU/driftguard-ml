@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.11"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.11", "pandas-stubs>=2.2"]
 
 [project.scripts]
 driftguard = "driftguard.cli:main"
@@ -55,7 +55,8 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-# river and evidently do not ship py.typed markers we can rely on across the
-# version range this project supports.
-module = ["river.*", "evidently.*"]
+# river, evidently and scikit-learn do not ship py.typed markers we can rely on
+# across the version range this project supports. pandas is typed via the
+# pandas-stubs dev dependency, so it is deliberately absent from this list.
+module = ["river.*", "evidently.*", "sklearn.*"]
 ignore_missing_imports = true

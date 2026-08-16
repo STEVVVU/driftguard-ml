@@ -51,6 +51,14 @@ class PageHinkley:
     ``reset()`` after each alert the two emit identical alert sequences.
     """
 
+    # Declared here rather than only in reset(): the state is initialized by the
+    # reset() call in __init__, which mypy cannot follow well enough to infer the
+    # types from the assignments alone.
+    count: int
+    mean: float
+    cumulative: float
+    minimum: float
+
     def __init__(self, *, delta: float = 0.002, threshold: float = 8.0, min_samples: int = 100):
         if threshold <= 0 or min_samples <= 0:
             raise ValueError("threshold and min_samples must be positive")

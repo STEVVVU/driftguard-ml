@@ -1,4 +1,7 @@
+import pytest
+
 from driftguard.real_experiment import (
+    DETECTORS,
     ElectricityExperimentConfig,
     run_electricity_experiment,
 )
@@ -48,4 +51,43 @@ def test_real_experiment_respects_delay_and_adapts_after_reversal(tmp_path) -> N
     assert result["adaptive"]["log_loss"] < result["frozen"]["log_loss"]
     assert result["leakage_audit"]["minimum_observed_delay"] >= 9
     assert result["leakage_audit"]["violations"] == 0
+
+
+@pytest.mark.parametrize("detector", DETECTORS)
+def test_every_detector_can_drive_the_production_path(detector: str, tmp_path) -> None:
+    """Each selectable detector must run the loop and preserve the label delay.
+
+    This is what makes the "river detectors are wired into the production path,
+    not just unit-tested" claim checkable: swapping the detector must not change
+    the temporal contract, only when the adaptive model resets.
+    """
+
+    dataset = tmp_path / "electricity.arff"
+    _write_regime_reversal(dataset)
+    result = run_electricity_experiment(
+        dataset,
+        ElectricityExperimentConfig(
+            warmup=200,
+            label_delay=9,
+            replay_size=100,
+            detector=detector,
+            detector_reference=100,
+            detector_recent=50,
+            detector_min_effect=0.05,
+            detector_z=2.0,
+        ),
+    )
+
+    assert result["config"]["detector"] == detector
+    assert result["adaptive"]["log_loss"] < result["frozen"]["log_loss"]
+    # The leakage guarantee is a property of the event loop, not the detector, so
+    # it must hold identically for every one of them.
+    assert result["leakage_audit"]["minimum_observed_delay"] >= 9
+    assert result["leakage_audit"]["violations"] == 0
+    assert result["leakage_audit"]["labels_processed"] == 800
+
+
+def test_unknown_detector_is_rejected(tmp_path) -> None:
+    with pytest.raises(ValueError, match="detector must be one of"):
+        ElectricityExperimentConfig(detector="not_a_detector").validate()
 

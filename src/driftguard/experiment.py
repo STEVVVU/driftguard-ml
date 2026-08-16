@@ -52,8 +52,13 @@ def _log_loss(label: int, probability: float) -> float:
     return -(label * math.log(probability) + (1 - label) * math.log(1 - probability))
 
 
+# Shared default instance. Safe as a default argument because the dataclass is
+# frozen, so no caller can mutate the value the next one sees.
+DEFAULT_CONFIG = ExperimentConfig()
+
+
 def run_experiment(
-    config: ExperimentConfig = ExperimentConfig(), *, output_dir: str | Path | None = None
+    config: ExperimentConfig = DEFAULT_CONFIG, *, output_dir: str | Path | None = None
 ) -> dict[str, object]:
     """Run an online experiment in event time.
 

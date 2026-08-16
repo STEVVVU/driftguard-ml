@@ -4,7 +4,6 @@ import pytest
 
 from driftguard.datasets import download_electricity, electricity_stream
 
-
 ARFF = """\
 @relation electricity
 @attribute date numeric

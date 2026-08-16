@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 
@@ -15,7 +16,9 @@ class Transaction:
     regime: str
 
 
-def transaction_stream(samples: int, *, seed: int = 7, drift_at: int | None = None):
+def transaction_stream(
+    samples: int, *, seed: int = 7, drift_at: int | None = None
+) -> Iterator[Transaction]:
     """Yield synthetic transactions whose fraud mechanism changes once.
 
     The post-drift regime changes both covariates and the conditional target
