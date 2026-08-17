@@ -9,13 +9,52 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        # 3.10 was dropped: the package now requires >=3.11 (metrics.py relies on
+        # zip(strict=True), and the codebase uses PEP 604 isinstance unions).
+        python-version: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          # numpy/pandas/scikit-learn/evidently wheels dominate install time.
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - run: python -m pip install -e ".[dev]"
       - run: ruff check .
+      - run: mypy
       - run: pytest
 
+  experiment:
+    # The end-to-end run is a separate job because it downloads the real dataset:
+    # a network failure should not be reported as a unit-test failure.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - name: Run the seeded synthetic experiment
+        run: python -m driftguard run --samples 12000 --output artifacts
+      - name: Run the real chronological benchmark
+        run: python -m driftguard electricity --output artifacts
+      - name: Render the Evidently drift report
+        run: python -m driftguard report --output artifacts
+      - name: Assert the committed metrics match a fresh run
+        # The guard against stale numbers: if a change moves a metric, this fails
+        # until artifacts/ and the README are regenerated together.
+        #
+        # Scoped to the two metrics files rather than all of artifacts/. Those are
+        # produced by this repo's own deterministic code. The Evidently snapshot
+        # additionally embeds scipy p-values and an Evidently schema version, so
+        # pinning it byte-for-byte would fail on an upstream patch release rather
+        # than on a real regression. It is still uploaded below for inspection.
+        run: git diff --exit-code -- artifacts/metrics.json artifacts/electricity_metrics.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drift-artifacts
+          path: artifacts/

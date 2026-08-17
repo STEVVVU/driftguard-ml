@@ -11,3 +11,7 @@ artifacts/*
 !artifacts/.gitkeep
 !artifacts/metrics.json
 !artifacts/electricity_metrics.json
+# The Evidently JSON snapshot is small and is the machine-readable drift evidence,
+# so it is checked in. The rendered HTML (~4.5 MB, bundles its own JS) and the
+# parquet copy of the two splits (~400 KB) are regenerable and stay ignored.
+!artifacts/electricity_drift_report.json

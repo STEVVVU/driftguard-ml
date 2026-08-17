@@ -1,17 +1,18 @@
 {
   "adaptive": {
-    "average_precision": 0.2102061399157838,
-    "brier_score": 0.040576034895139466,
+    "accuracy_at_threshold": 0.8126,
+    "average_precision": 0.21020613991578374,
+    "brier_score": 0.04057603489513956,
     "decision_threshold": 0.1,
-    "ece": 0.03265931561900421,
-    "log_loss": 0.17036580261055717,
+    "ece": 0.03265931561900429,
+    "log_loss": 0.17036580261055698,
     "observations": 10000,
     "positive_rate": 0.0448,
     "precision_at_threshold": 0.12748171368861025,
     "precision_at_top_5pct": 0.246,
     "recall_at_threshold": 0.5446428571428571,
     "recall_at_top_5pct": 0.27455357142857145,
-    "roc_auc": 0.7587593847212252
+    "roc_auc": 0.7587593847212251
   },
   "config": {
     "detector_threshold": 3.5,
@@ -26,11 +27,12 @@
     6950
   ],
   "frozen": {
-    "average_precision": 0.12462781298628045,
+    "accuracy_at_threshold": 0.7997,
+    "average_precision": 0.12462781298628028,
     "brier_score": 0.04272464474302123,
     "decision_threshold": 0.1,
-    "ece": 0.038596414374977725,
-    "log_loss": 0.18313245295596436,
+    "ece": 0.03859641437497777,
+    "log_loss": 0.18313245295596495,
     "observations": 10000,
     "positive_rate": 0.0448,
     "precision_at_threshold": 0.10949271722752386,
@@ -44,5 +46,5 @@
     "minimum_observed_delay": 40,
     "violations": 0
   },
-  "relative_log_loss_improvement": 0.06971265954962681
+  "relative_log_loss_improvement": 0.06971265954963084
 }
