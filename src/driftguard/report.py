@@ -66,8 +66,8 @@ def build_drift_report(
     """Render an Evidently data-drift report for the warmup-vs-production split.
 
     Returns a small provenance/summary dict and writes three artifacts: the HTML
-    report a human reads, the JSON snapshot CI can assert on, and a parquet copy
-    of the two frames so the report is reproducible without re-parsing the ARFF.
+    report a human reads, the machine-readable JSON snapshot, and a parquet copy of
+    the two frames so the comparison is reproducible without re-parsing the ARFF.
     """
 
     config.validate()
@@ -90,8 +90,9 @@ def build_drift_report(
     )
 
     # The day_* one-hots are declared numerical rather than categorical on
-    # purpose: as 0/1 indicators their mean *is* the category frequency, so a
-    # numeric distance test reports the shift in weekday mix directly.
+    # purpose: as 0/1 indicators their mean *is* the category frequency, so the
+    # numeric test picks up a shift in weekday mix without extra encoding, and one
+    # statistical test then covers every column uniformly.
     definition = DataDefinition(numerical_columns=columns)
     report = Report(
         [DataDriftPreset(num_method=config.drift_method, num_threshold=config.drift_threshold)]
