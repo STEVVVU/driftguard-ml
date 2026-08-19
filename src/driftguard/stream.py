@@ -82,4 +82,3 @@ def transaction_stream(
             label=label,
             regime="shifted" if post_drift else "initial",
         )
-

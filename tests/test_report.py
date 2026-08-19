@@ -34,8 +34,7 @@ def _write_shifting_arff(path, rows: int = 600, warmup: int = 200) -> None:
         nswprice = base + (0.5 if index >= warmup else 0.0)
         label = "UP" if index % 2 else "DOWN"
         lines.append(
-            f"{index / rows},{index % 7 + 1},{(index % 48) / 48},{nswprice},"
-            f"0.4,0.1,0.2,0.3,{label}"
+            f"{index / rows},{index % 7 + 1},{(index % 48) / 48},{nswprice},0.4,0.1,0.2,0.3,{label}"
         )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -45,9 +44,7 @@ def test_report_writes_html_json_and_parquet_artifacts(tmp_path) -> None:
     _write_shifting_arff(dataset)
     output = tmp_path / "artifacts"
 
-    result = build_drift_report(
-        dataset, DriftReportConfig(warmup=200), output_dir=output
-    )
+    result = build_drift_report(dataset, DriftReportConfig(warmup=200), output_dir=output)
 
     assert result["reference_rows"] == 200
     assert result["current_rows"] == 400

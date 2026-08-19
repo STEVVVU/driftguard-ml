@@ -86,9 +86,7 @@ class FeatureSpace:
         """Split a feature mapping into (column indices, values) arrays."""
 
         names = tuple(features)
-        values = np.fromiter(
-            (features[name] for name in names), dtype=np.float64, count=len(names)
-        )
+        values = np.fromiter((features[name] for name in names), dtype=np.float64, count=len(names))
         return self.columns(names), values
 
 
@@ -203,9 +201,7 @@ class FTRLProximal:
         weights = -(z - np.sign(z) * penalties) / denominator
         return np.where(np.abs(z) <= penalties, 0.0, weights)
 
-    def _row(
-        self, features: Mapping[str, float]
-    ) -> tuple[NDArray[np.intp], NDArray[np.float64]]:
+    def _row(self, features: Mapping[str, float]) -> tuple[NDArray[np.intp], NDArray[np.float64]]:
         """Return the (columns, values) of a row with the intercept prepended."""
 
         columns, values = self.space.resolve(features)

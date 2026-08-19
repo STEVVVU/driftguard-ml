@@ -58,13 +58,13 @@ def test_download_accepts_verified_content_and_reuses_cache(tmp_path) -> None:
     destination = tmp_path / "cache" / "electricity.arff"
     checksum = hashlib.md5(payload, usedforsecurity=False).hexdigest()
 
-    assert download_electricity(
-        destination, url=source.as_uri(), expected_md5=checksum
-    ) == destination
+    assert (
+        download_electricity(destination, url=source.as_uri(), expected_md5=checksum) == destination
+    )
     source.unlink()
-    assert download_electricity(
-        destination, url=source.as_uri(), expected_md5=checksum
-    ) == destination
+    assert (
+        download_electricity(destination, url=source.as_uri(), expected_md5=checksum) == destination
+    )
 
 
 def test_parser_rejects_invalid_class(tmp_path) -> None:

@@ -25,8 +25,7 @@ def _write_regime_reversal(path, rows: int = 800, warmup: int = 200) -> None:
         signal = float(index % 2)
         label = signal if index < warmup else 1.0 - signal
         lines.append(
-            f"{index / rows},{index % 7 + 1},0,{signal},0.2,0.3,0.4,0.5,"
-            f"{'UP' if label else 'DOWN'}"
+            f"{index / rows},{index % 7 + 1},0,{signal},0.2,0.3,0.4,0.5,{'UP' if label else 'DOWN'}"
         )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -90,4 +89,3 @@ def test_every_detector_can_drive_the_production_path(detector: str, tmp_path) -
 def test_unknown_detector_is_rejected(tmp_path) -> None:
     with pytest.raises(ValueError, match="detector must be one of"):
         ElectricityExperimentConfig(detector="not_a_detector").validate()
-

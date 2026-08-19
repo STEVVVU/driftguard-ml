@@ -64,7 +64,9 @@ class BinaryMetrics:
             )
         return self._cache
 
-    def summary(self, *, threshold: float = 0.1, calibration_bins: int = 10) -> dict[str, float | int]:
+    def summary(
+        self, *, threshold: float = 0.1, calibration_bins: int = 10
+    ) -> dict[str, float | int]:
         if not self.labels:
             raise ValueError("no observations recorded")
         labels, _ = self._arrays()
@@ -98,9 +100,7 @@ class BinaryMetrics:
         # sum-over-both-columns form, which is exactly twice as large; the
         # default of "auto" already picks True for binary input, but pinning it
         # keeps the reported number stable if that heuristic ever changes.
-        return float(
-            brier_score_loss(labels, probabilities, labels=[0, 1], scale_by_half=True)
-        )
+        return float(brier_score_loss(labels, probabilities, labels=[0, 1], scale_by_half=True))
 
     def roc_auc(self) -> float:
         labels, probabilities = self._arrays()
@@ -157,9 +157,7 @@ class BinaryMetrics:
         labels, _ = self._arrays()
         # zero_division=0 preserves the prior contract: no predicted positives
         # scores as 0.0 precision rather than raising or returning NaN.
-        return float(
-            precision_score(labels, self._predictions(threshold), zero_division=0.0)
-        )
+        return float(precision_score(labels, self._predictions(threshold), zero_division=0.0))
 
     def recall(self, threshold: float) -> float:
         labels, _ = self._arrays()

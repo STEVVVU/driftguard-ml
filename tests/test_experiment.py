@@ -21,4 +21,3 @@ def test_adaptation_beats_frozen_pre_drift_model() -> None:
         ExperimentConfig(samples=4_000, warmup=700, label_delay=20, drift_at=2_000)
     )
     assert result["adaptive"]["log_loss"] < result["frozen"]["log_loss"]
-

@@ -137,8 +137,7 @@ def run_experiment(
                 row["revealed_at"] - row["event_index"] for row in label_audit
             ),
             "violations": sum(
-                row["revealed_at"] - row["event_index"] < config.label_delay
-                for row in label_audit
+                row["revealed_at"] - row["event_index"] < config.label_delay for row in label_audit
             ),
         },
     }

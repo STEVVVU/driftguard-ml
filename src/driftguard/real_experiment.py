@@ -57,7 +57,10 @@ class ElectricityExperimentConfig:
             # the threshold is scaled to the loss magnitude of this stream.
             return RiverDetector(
                 river_drift.PageHinkley(
-                    delta=0.005, threshold=20.0, min_instances=self.detector_recent, mode="up",
+                    delta=0.005,
+                    threshold=20.0,
+                    min_instances=self.detector_recent,
+                    mode="up",
                     alpha=1.0,
                 )
             )
@@ -195,4 +198,3 @@ def run_electricity_experiment(
             json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
     return result
-

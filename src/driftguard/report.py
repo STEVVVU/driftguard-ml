@@ -73,9 +73,7 @@ def build_drift_report(
     config.validate()
     frame = read_electricity(dataset)
     if len(frame) <= config.warmup:
-        raise ValueError(
-            f"dataset has {len(frame)} rows, not enough for warmup {config.warmup}"
-        )
+        raise ValueError(f"dataset has {len(frame)} rows, not enough for warmup {config.warmup}")
 
     columns = electricity_feature_columns()
     # .copy() so the slices own their buffers; evidently holds on to these frames
@@ -194,5 +192,3 @@ def _summarize(json_path: Path) -> dict[str, object]:
                 column for column, score in scores.items() if score < threshold
             )
     return summary
-
-
