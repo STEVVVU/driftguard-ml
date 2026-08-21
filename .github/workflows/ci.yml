@@ -53,6 +53,14 @@ jobs:
         # pinning it byte-for-byte would fail on an upstream patch release rather
         # than on a real regression. It is still uploaded below for inspection.
         run: git diff --exit-code -- artifacts/metrics.json artifacts/electricity_metrics.json
+      - name: Assert the README figures match the artifacts
+        # The other direction of the same guard. `git diff` above catches a code
+        # change that moves a metric; it cannot catch regenerating the artifacts
+        # and forgetting the README, which leaves both files self-consistent and
+        # the prose wrong. This step restates each documented figure as an
+        # assertion. It runs after the download so the constant-column check has
+        # the dataset available.
+        run: python scripts/check_documented_metrics.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
