@@ -84,7 +84,9 @@ as unverified duplicates; this is the third option.
 asserts the in-repo `PageHinkley` emits the **byte-identical alert index
 sequence** as `river.drift.PageHinkley(mode="up", alpha=1.0)` across four
 `(delta, threshold, min_samples)` configurations. A wider 200-configuration
-randomized sweep run during development also matched exactly. The single
+randomized sweep (seeds 0–199, `delta` 5e-4–0.02, `threshold` 1–100,
+`min_samples` 5–300, 600 pre-shift + 600 post-shift observations each) matched
+exactly as well — zero mismatched alert sequences. The single
 behavioural difference is re-arming: the in-repo detector *latches* until
 `reset()` is called (so a caller controls when to re-arm), while river's
 auto-resets on detection — so the comparison resets after each alert.
@@ -225,10 +227,18 @@ the reasons are worth being precise about:
 
 - **NumPy accumulation order.** NumPy sums with pairwise accumulation while the
   previous implementation summed left-to-right in dict-insertion order. Predicted
-  probabilities agree with the old implementation to **≤4e-16** (verified over
-  4,000 sparse events across three hyperparameter settings, including a mid-run
-  reset); the standardizer output is bit-identical. Log loss, Brier, ROC-AUC,
-  precision, recall and accuracy all agree to **≤4e-15**.
+  probabilities agree with the old implementation to **≤1e-15**: the worst
+  per-event disagreement was 5.0e-16 on the reference replay (4,000 sparse events
+  across three hyperparameter settings, including a mid-run reset) and ranged
+  **1.1e-16 – 6.1e-16** across twelve further randomized replays (`random.Random`
+  seeds 1000–1011; 8/40/200 features, feature scale 0.5–10, `alpha` 0.05–0.2,
+  `beta` 0.5–2, `l1` 0–1, `l2` 0.01–2, reset at event 2,000). This is a range
+  rather than a single number on purpose — the bound depends on the workload's
+  feature count and scale, so a point value quoted from one replay would not
+  survive another. The standardizer output is bit-identical. Log loss and Brier
+  agree to **≤1e-14** (worst observed 5.2e-15 and 3.2e-15 over eight 20,000-event
+  replays, seeds 3000–3007); ROC-AUC to 1.1e-16; precision, recall and accuracy
+  are exactly equal.
 - **Average precision genuinely changed**, from 0.8227688 to 0.8227457
   (2.8e-5 relative). This is a correctness fix, not noise: `sklearn` evaluates
   one point per *distinct* score threshold, whereas the removed rank-walk
@@ -240,10 +250,18 @@ the reasons are worth being precise about:
 - **Expected calibration error** needed `np.arange(1, bins) / bins` for its bin
   edges rather than `np.linspace`, which renders 0.3 / 0.6 / 0.7 inexactly and
   misfiled probabilities sitting exactly on those boundaries. With exact edges it
-  matches the previous value to 2e-16.
+  matches the previous value to **≤1e-14** (1.1e-16 – 4.2e-15 over ten
+  30,000-observation replays, seeds 2000–2009, half the probabilities placed
+  exactly on a bin edge). With `np.linspace` edges the same replays disagree by up
+  to 2.0e-3 — twelve orders of magnitude larger, which is what makes this a real
+  bug and not a rounding preference.
 
 Every metric in this README and in `artifacts/` was regenerated after the
-migration; none is carried over from a prior run.
+migration; none is carried over from a prior run. Deleting `artifacts/` and
+re-running all three CLI subcommands reproduces the two committed metrics files
+byte-for-byte, on both Python versions in the CI matrix (3.11 and 3.13 agree to
+the last digit). `scripts/check_documented_metrics.py` asserts that the figures
+quoted in this file still match those artifacts, and CI runs it.
 
 ## Repository map
 
