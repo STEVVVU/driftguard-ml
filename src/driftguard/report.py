@@ -106,7 +106,8 @@ def build_drift_report(
     json_path = destination / config.json_name
     parquet_path = destination / config.parquet_name
     snapshot.save_html(str(html_path))
-    json_path.write_text(snapshot.json(), encoding="utf-8")
+    # newline="\n" for the same cross-platform reason as the metrics artifacts.
+    json_path.write_text(snapshot.json(), encoding="utf-8", newline="\n")
 
     # One tidy frame with a `split` label rather than two files, so a reader can
     # reproduce the comparison with a single read_parquet + groupby.

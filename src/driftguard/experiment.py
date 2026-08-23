@@ -148,7 +148,14 @@ def run_experiment(
     if output_dir is not None:
         destination = Path(output_dir)
         destination.mkdir(parents=True, exist_ok=True)
+        # newline="\n" pins LF on every platform. Without it Windows text mode
+        # rewrites each \n as \r\n, so the same deterministic run emits different
+        # bytes on Windows and Linux -- which would make CI's byte-for-byte
+        # `git diff --exit-code` guard depend on the developer's core.autocrlf
+        # setting rather than on the code.
         (destination / "metrics.json").write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps(result, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
         )
     return result
