@@ -1,0 +1,17 @@
+# Line endings are repo state, not a per-developer git setting.
+#
+# This repo is the reason the rule matters. The artifact writers in
+# experiment.py, real_experiment.py and report.py pass newline="\n" so their
+# JSON is byte-identical across platforms, and check_documented_metrics.py
+# asserts on those committed bytes. That fix pins what the *writers* emit;
+# this file pins what *git* stores and checks out, which is the other half.
+# Without it, a clone with core.autocrlf=true would materialise the committed
+# artifacts with CRLF and the guard would compare re-flowed bytes.
+* text eol=lf
+
+# report.py writes a .parquet into artifacts/ alongside the JSON that IS
+# committed, and .gitignore un-ignores files in that directory one by one --
+# so the parquet is a single `git add -f` away from being tracked. Declared
+# binary now, because the `text` rule above would otherwise strip CR bytes
+# out of it on commit and corrupt it silently.
+*.parquet binary
