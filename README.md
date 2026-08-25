@@ -38,8 +38,8 @@ metrics, and CI.
 - Prevented future information from leaking into training by enforcing a
   48-event label delay across all **45,312** records, with **zero violations**.
 - Validated hand-written drift detectors against `river`'s reference
-  implementations, reaching the same adaptation quality with **7 alerts instead
-  of 130** — a 94% cut in operator pages for equal model quality.
+  implementations — byte-identical alert sequences — and drove the measured run
+  on an effect-size-gated detector that raised only **7 operator alerts**.
 - Implemented FTRL-Proximal learning, past-only feature scaling, drift alerts,
   bounded replay, checksum-verified ingestion, `evidently` drift reporting,
   automated tests, type checking, and CI.
@@ -95,20 +95,22 @@ auto-resets on detection — so the comparison resets after each alert.
 operational requirement neither library detector has: it alerts only on a
 one-sided loss *increase* that clears both a significance threshold and a
 **minimum effect size**, after clipping outliers. ADWIN is two-sided (it also
-fires when loss *improves*) and has no effect-size floor. That difference is
-measurable — all three drive the same loop via `--detector`:
+fires when loss *improves*) and has no effect-size floor. All three drive the
+same loop via `--detector`, and `two_window` is the configuration that was
+actually measured:
 
 | Detector | Alerts | Adaptive log loss | Improvement vs frozen | ROC-AUC |
 | --- | ---: | ---: | ---: | ---: |
 | `two_window` (default) | 7 | **0.4737** | **26.09%** | **0.8501** |
-| `river_page_hinkley` | 41 | 0.4773 | 25.54% | 0.8472 |
-| `river_adwin` | 130 | 0.4789 | 25.29% | 0.8462 |
 
-All three adapt successfully and land within 0.8 points of each other, which is
-the useful result: the outcome is robust to the detector choice. `two_window` is
-kept as the default because it reaches a marginally better model with **7 alerts
-instead of 130** — in an operational setting the alert count *is* the cost, since
-each one pages someone and triggers a reset-and-replay.
+The river detectors ship as a `RiverDetector` adapter and are selectable from
+the CLI, but comparative detector metrics are not published here, because no
+committed artifact backs them. `scripts/check_documented_metrics.py` enforces
+that boundary: every row of the table above must map to a committed artifact
+whose `config.detector` names it, so a row added without one fails CI. The alert
+count is the operationally interesting column — each alert pages someone and
+triggers a reset-and-replay — which is why the effect-size floor that suppresses
+non-actionable alerts is the default.
 
 ## Architecture
 

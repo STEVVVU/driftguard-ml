@@ -22,8 +22,11 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # (json path, expected value, absolute tolerance)
 #
@@ -107,6 +110,29 @@ EXPECTED_FEATURE_COUNT = 13
 STABLE_FEATURE_P_FLOOR = 0.95
 STABLE_FEATURES = ("period", "day_1", "day_2", "day_3", "day_4", "day_5", "day_6", "day_7")
 
+# The README's per-detector comparison table. Every data row is a claim about a
+# configuration that was actually run, so every row must name a detector some
+# committed artifact was produced with -- an unbacked row is exactly the defect
+# this block exists to catch, and the river rows that used to sit here had no
+# producer at all. Columns are matched by header text so a reordered or renamed
+# column is reported rather than silently mis-read.
+DETECTOR_TABLE_README = REPO_ROOT / "README.md"
+DETECTOR_TABLE_HEADINGS = (
+    "Detector",
+    "Alerts",
+    "Adaptive log loss",
+    "Improvement vs frozen",
+    "ROC-AUC",
+)
+# (column heading, json path, absolute tolerance) -- tolerances again match the
+# precision the README prints, and the alert count is exact.
+DETECTOR_COLUMNS: tuple[tuple[str, str, float], ...] = (
+    ("Alerts", "drift_alerts_count", 0),
+    ("Adaptive log loss", "adaptive.log_loss", 5e-5),
+    ("Improvement vs frozen", "relative_log_loss_improvement", 5e-5),
+    ("ROC-AUC", "adaptive.roc_auc", 5e-5),
+)
+
 
 def _dig(payload: object, dotted: str) -> object:
     """Resolve a dotted path like 'adaptive.log_loss' through nested dicts."""
@@ -135,6 +161,138 @@ def _check(payload: object, claims: tuple[Claim, ...], label: str) -> list[str]:
         ):
             failures.append(f"{label}: {dotted} expected {expected} +/-{tolerance}, got {actual}")
     return failures
+
+
+def _split_row(line: str) -> list[str]:
+    """Split one markdown table line into stripped cells."""
+
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _parse_cell(text: str) -> float | None:
+    """Read a table cell as a number, undoing bold markers and percent signs.
+
+    Returns None when the cell is not a plain number, which is reported as a
+    mismatch rather than silently skipped.
+    """
+
+    cleaned = text.replace("*", "").replace(",", "").strip()
+    scale = 1.0
+    if cleaned.endswith("%"):
+        cleaned = cleaned[:-1].strip()
+        scale = 0.01
+    try:
+        return float(cleaned) * scale
+    except ValueError:
+        return None
+
+
+def _detector_artifacts(artifacts: Path) -> dict[str, tuple[str, dict]]:
+    """Map detector name -> (artifact filename, payload) for every committed artifact.
+
+    Only artifacts that record which detector produced them can back a row of the
+    README's comparison table; anything else is not evidence for a detector claim.
+    """
+
+    index: dict[str, tuple[str, dict]] = {}
+    for path in sorted(artifacts.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        config = payload.get("config")
+        detector = config.get("detector") if isinstance(config, dict) else None
+        if isinstance(detector, str):
+            index.setdefault(detector, (path.name, payload))
+    return index
+
+
+def _check_detector_table(artifacts: Path) -> tuple[list[str], int]:
+    """Assert every row of the README's detector comparison table has a producer.
+
+    Each data row claims a measured configuration, so it must (a) name a detector
+    that some committed artifact was generated with and (b) restate that
+    artifact's numbers. A row with no backing artifact is a number with no
+    producer, which is the failure this guard exists to make loud.
+
+    Returns the failures plus the number of assertions actually performed, so a
+    table that quietly loses rows shrinks the reported count instead of passing
+    vacuously.
+    """
+
+    failures: list[str] = []
+    if not DETECTOR_TABLE_README.exists():
+        return [f"detector table: {DETECTOR_TABLE_README} is missing"], 0
+
+    lines = DETECTOR_TABLE_README.read_text(encoding="utf-8").splitlines()
+    header_index = next(
+        (i for i, line in enumerate(lines) if _split_row(line) == list(DETECTOR_TABLE_HEADINGS)),
+        None,
+    )
+    if header_index is None:
+        # Not "nothing to check": the table is documented as the thing this guard
+        # covers, so losing or renaming it must fail rather than pass silently.
+        return [
+            "detector table: no table with headings "
+            f"{list(DETECTOR_TABLE_HEADINGS)} found in {DETECTOR_TABLE_README.name}"
+        ], 0
+
+    columns = {heading: position for position, heading in enumerate(DETECTOR_TABLE_HEADINGS)}
+    rows: list[list[str]] = []
+    for line in lines[header_index + 2 :]:  # skip the |---| alignment row
+        if not line.strip().startswith("|"):
+            break
+        rows.append(_split_row(line))
+    if not rows:
+        return ["detector table: the comparison table has no data rows"], 0
+
+    index = _detector_artifacts(artifacts)
+    checked = 0
+    for row in rows:
+        if len(row) != len(DETECTOR_TABLE_HEADINGS):
+            failures.append(f"detector table: row {row!r} does not have {len(columns)} cells")
+            continue
+        name_match = re.search(r"`([^`]+)`", row[columns["Detector"]])
+        if name_match is None:
+            failures.append(f"detector table: row {row!r} does not name a detector in backticks")
+            continue
+        detector = name_match.group(1)
+        checked += 1
+        backing = index.get(detector)
+        if backing is None:
+            failures.append(
+                f"detector table: row `{detector}` is not backed by any committed artifact "
+                f"(artifacts recording a detector: {sorted(index) or 'none'})"
+            )
+            continue
+        artifact_name, payload = backing
+        for heading, dotted, tolerance in DETECTOR_COLUMNS:
+            checked += 1
+            claimed = _parse_cell(row[columns[heading]])
+            if claimed is None:
+                failures.append(
+                    f"detector table: `{detector}` {heading!r} cell "
+                    f"{row[columns[heading]]!r} is not a number"
+                )
+                continue
+            if dotted == "drift_alerts_count":
+                actual: object = len(payload.get("drift_alerts", ()))
+            else:
+                try:
+                    actual = _dig(payload, dotted)
+                except KeyError:
+                    failures.append(f"detector table: {dotted} is missing from {artifact_name}")
+                    continue
+            if not isinstance(actual, int | float) or not math.isclose(
+                float(actual), claimed, abs_tol=float(tolerance) or 0.0
+            ):
+                failures.append(
+                    f"detector table: `{detector}` {heading} reads {claimed} but "
+                    f"{artifact_name} {dotted} is {actual}"
+                )
+    return failures, checked
 
 
 def main(argv: list[str]) -> int:
@@ -208,6 +366,9 @@ def main(argv: list[str]) -> int:
             f"report: columns constant in the reference window expected "
             f"{EXPECTED_CONSTANT_FEATURES}, got {constant}"
         )
+    detector_failures, detector_checked = _check_detector_table(artifacts)
+    failures += detector_failures
+
     for feature in STABLE_FEATURES:
         score = p_values.get(feature)
         if score is None or score < STABLE_FEATURE_P_FLOOR:
@@ -232,6 +393,7 @@ def main(argv: list[str]) -> int:
         + len(REPORT_CLAIMS)
         + 7
         + len(STABLE_FEATURES)
+        + detector_checked
     )
     print(f"All {checked} documented metrics match the committed artifacts.")
     return 0
