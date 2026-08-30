@@ -1,8 +1,8 @@
-# DriftGuard ML
+# ML Monitoring Pipeline
 
-A delayed-feedback online-learning system built around production failure
-modes: concept drift, temporal leakage, stale models, calibration, and labels
-that arrive after predictions are served.
+An online machine-learning pipeline that updates a model over time, handles
+delayed labels, detects data drift, and tracks model quality on chronological
+data.
 
 This is not a notebook. It is a deterministic experiment package with a CLI,
 an auditable event-time loop, checksum-verified real data, unit tests, saved
